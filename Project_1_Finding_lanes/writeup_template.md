@@ -16,6 +16,11 @@ The goals / steps of this project are the following:
 [//]: # (Image References)
 
 [grayscale]: ./writeup/grayscale.png "Grayscale"
+[gausian]: ./writeup/blur_gray.png "Gausian smoothing"
+[canny]: ./writeup/canny.png "Canny edge detection"
+[mask]: ./writeup/mask.png "Polygon of interest"
+[canny_mask]: ./writeup/mask.png "Canny edge detection and filtered region of interest"
+
 
 ---
 
@@ -37,7 +42,11 @@ The pipeline consists of several steps.
 
 ![Canny detection][canny]
 
-4. step is to define polygon of interest and apply it to the edges detected by Canny detection. This limits field of view to part in front of a vehicle and reduces noice from surounding.
+4. step is to define polygon of interest and apply it to the edges detected by Canny detection. This limits field of view to part in front of a vehicle and reduces noice from surounding. The polygon of interest is defined based on the resolution of the image, to make sure that it stays proportional to the image and camtures relevant area.
+
+![Mask][mask]
+![Canny_mask][canny_mask]
+
 
 5. step is to apply Hough line detection to filter relevat segments which represent borders of lanes. The individual parameters of Hough line detection efect the sensitivity and final lane detection. For my lane detecition, I have used rho = 1, treshold = 20, min_line_length = 25, max_line_gap = 50.
 
