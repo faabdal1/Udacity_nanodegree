@@ -21,9 +21,28 @@ The goals / steps of this project are the following:
 
 ### Reflection
 
-### 1. Describe your pipeline. As part of the description, explain how you modified the draw_lines() function.
+### 1. Pipeline
 
-My pipeline consisted of 5 steps. First, I converted the images to grayscale, then I .... 
+The pipeline consists of several steps. 
+
+1. step is to load the picture (sigle picture or in loop from video) and convert it into grayscale
+
+![Grayscale pic][grayscale]
+
+2. step is to apply Gausian smoothing where I chose kernel size 5 to reduce noise and enhance image structures.
+
+![Gausian smoothing][gausian]
+
+3. step is to define parameters for canny edge detection and apply to the image 
+
+![Canny detection][canny]
+
+4. step is to define polygon of interest and apply it to the edges detected by Canny detection. This limits field of view to part in front of a vehicle and reduces noice from surounding.
+
+5. step is to apply Hough line detection to filter relevat segments which represent borders of lanes. The individual parameters of Hough line detection efect the sensitivity and final lane detection. For my lane detecition, I have used rho = 1, treshold = 20, min_line_length = 25, max_line_gap = 50.
+
+
+
 
 In order to draw a single line on the left and right lanes, I modified the draw_lines() function by ...
 
