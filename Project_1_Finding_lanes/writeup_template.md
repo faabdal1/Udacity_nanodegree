@@ -15,7 +15,7 @@ The goals / steps of this project are the following:
 
 [//]: # (Image References)
 
-[gayscale]: ./writeup/grayscale.png "Grayscale"
+[grayscale]: ./writeup/grayscale.png "Grayscale"
 
 ---
 
