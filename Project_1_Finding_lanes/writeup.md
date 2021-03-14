@@ -49,12 +49,12 @@ The pipeline consists of several steps.
 
 5. step is to apply Hough line detection to filter relevat segments which represent borders of lanes. The individual parameters of Hough line detection efect the sensitivity and final lane detection. For my lane detecition, I have used rho = 1, treshold = 20, min_line_length = 25, max_line_gap = 50. Function returns array of lines endpoints.
 
-6a. step interate through the lines and draw them on a blank image. The initial function draws a raw lines without aditional processing as it is show on picture below. The image is then drawn on the original image (semi-transparent) and saved or added to the new video stream.
+6. a) step interate through the lines and draw them on a blank image. The initial function draws a raw lines without aditional processing as it is show on picture below. The image is then drawn on the original image (semi-transparent) and saved or added to the new video stream.
 
 ![Raw_lines][raw_lines]
 ![Raw_lines_image][raw_lines_image]
 
-6b. in order to improve detection, draw function was improved. The lines detected by Hough line fuction were separated according to their slope to decide which belong on left and right side. The mean position and slope of right lines and also mean position and slope of left lines were found. These two lines were then interpolated and the linear lines were drawn on a blank picture. The picture is then drawn (semi-transparant) on the original image and saved or added to the new video stream.
+6. b) in order to improve detection, draw function was improved. The lines detected by Hough line fuction were separated according to their slope to decide which belong on left and right side. The mean position and slope of right lines and also mean position and slope of left lines were found. These two lines were then interpolated and the linear lines were drawn on a blank picture. The picture is then drawn (semi-transparant) on the original image and saved or added to the new video stream.
 
 ![Lines][lines]
 ![Lines_image][lines_image]
