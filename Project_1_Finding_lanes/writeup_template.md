@@ -1,9 +1,5 @@
 # **Finding Lane Lines on the Road** 
 
-## Writeup Template
-
-### You can use this file as a template for your writeup if you want to submit it as a markdown file. But feel free to use some other method and submit a pdf if you prefer.
-
 ---
 
 **Finding Lane Lines on the Road**
@@ -19,8 +15,11 @@ The goals / steps of this project are the following:
 [gausian]: ./writeup/blur_gray.png "Gausian smoothing"
 [canny]: ./writeup/canny.png "Canny edge detection"
 [mask]: ./writeup/mask.png "Polygon of interest"
-[canny_mask]: ./writeup/mask.png "Canny edge detection and filtered region of interest"
-
+[canny_mask]: ./writeup/canny_mask.png "Canny edge detection and filtered region of interest"
+[raw_lines]: ./writeup/raw_lines.png "Raw lines drawn on a blank image"
+[raw_lines_image]: ./writeup/raw_lines_image.png "Raw lines image drawn over original image"
+[lines]: ./writeup/lines.png "Averaged and interpolated lines drawn on a blank image"
+[lines_image]: ./writeup/lines_image.png "Lines image drawn over original image"
 
 ---
 
@@ -48,28 +47,36 @@ The pipeline consists of several steps.
 ![Canny_mask][canny_mask]
 
 
-5. step is to apply Hough line detection to filter relevat segments which represent borders of lanes. The individual parameters of Hough line detection efect the sensitivity and final lane detection. For my lane detecition, I have used rho = 1, treshold = 20, min_line_length = 25, max_line_gap = 50.
+5. step is to apply Hough line detection to filter relevat segments which represent borders of lanes. The individual parameters of Hough line detection efect the sensitivity and final lane detection. For my lane detecition, I have used rho = 1, treshold = 20, min_line_length = 25, max_line_gap = 50. Function returns array of lines endpoints.
 
+6a. step interate through the lines and draw them on a blank image. The initial function draws a raw lines without aditional processing as it is show on picture below. The image is then drawn on the original image (semi-transparent) and saved or added to the new video stream.
 
+![Raw_lines][raw_lines]
+![Raw_lines_image][raw_lines_image]
 
+6b. in order to improve detection, draw function was improved. The lines detected by Hough line fuction were separated according to their slope to decide which belong on left and right side. The mean position and slope of right lines and also mean position and slope of left lines were found. These two lines were then interpolated and the linear lines were drawn on a blank picture. The picture is then drawn (semi-transparant) on the original image and saved or added to the new video stream.
 
-In order to draw a single line on the left and right lanes, I modified the draw_lines() function by ...
+![Lines][lines]
+![Lines_image][lines_image]
 
-If you'd like to include images to show how the pipeline works, here is how to include an image: 
-
-![alt text][image1]
-
+7. testing of the line detection function on various video stream and check outcome.
 
 ### 2. Identify potential shortcomings with your current pipeline
 
 
-One potential shortcoming would be what would happen when ... 
+One potential shortcoming is detection in different light condition or weather conditions. Espetially night time brings new challenges. 
 
-Another shortcoming could be ...
+Selection of parameters for Canny function and Hough line detection was done based on personal feeling. It might not cover the best possible results.
+
+Another shortcoming is that the function expects that the lane marking is straight. The it applies only linear interpolation and does not cosider turns.
+
+The function does not uses information from previous frame or it does not stabilises the detected lines.
 
 
 ### 3. Suggest possible improvements to your pipeline
 
-A possible improvement would be to ...
+A possible improvement would be to include infromation from previous frames and to stabilises line detection. Currently some frames causes suddent jumps in line detection.
 
-Another potential improvement could be to ...
+Another improvment should be to detect bend lines in curves and to interpolate using polynomial function.
+
+Third possible improvement could be to add confident level to describe how good the line detection is and to estimate lane marking in cases that one frame does not get any detection.
