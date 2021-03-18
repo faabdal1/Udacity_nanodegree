@@ -105,15 +105,43 @@ dir_binary = dir_threshold(image, sobel_kernel=ksize, thresh=(0, np.pi/2))
 
 hls_binary = hls_select(image, thresh=(0, 115))
 
-plt.figure()
 
 #To test combinations
-combined = np.zeros_like(dir_binary)
-combined[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
+combined0 = np.zeros_like(dir_binary)
+combined0[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1))] = 1
 
+combined1 = np.zeros_like(dir_binary)
+combined1[((gradx == 1))] = 1
+
+combined2 = np.zeros_like(dir_binary)
+combined2[((gradx == 1) & (grady == 1)) | ((mag_binary == 1) & (dir_binary == 1)) & (hls_binary == 1)] = 1
+
+combined3 = np.zeros_like(dir_binary)
+combined3[((gradx == 1) & (grady == 0)) | ((mag_binary == 1) & (dir_binary == 1)) & (hls_binary == 1)] = 1
+
+
+#fig = plt.figure()
+#plt.imshow(combined, cmap='gray')
+#fig = plt.figure()
+#plt.imshow(combined2, cmap='gray')
+
+
+f, axarr = plt.subplots(2,2)
+axarr[0,0].imshow(combined0)
+axarr[0,1].imshow(combined1)
+axarr[1,0].imshow(combined2)
+axarr[1,1].imshow(combined3)
+
+
+#f.tight_layout()
+#ax1[0,0].imshow(combined, map='gray')
+#ax1.set_title('Original Image', fontsize=50)
+#ax1[0,1].imshow(combined2, cmap='gray')
+#ax2.set_title('Thresholded Grad. Dir.', fontsize=50)
+#plt.subplots_adjust(left=0., right=1, top=0.9, bottom=0.)
 
 #plt.imshow(combined, cmap='gray')
-plt.imshow(hls_binary, cmap='gray')
+#plt.imshow(hls_binary, cmap='gray')
 plt.show()
 
 print("Done")
