@@ -30,7 +30,7 @@ def find_lane_pixels(binary_warped):
 
     # HYPERPARAMETERS
     # Choose the number of sliding windows
-    nwindows = 9
+    nwindows = 12
     # Set the width of the windows +/- margin
     margin = 100
     # Set minimum number of pixels found to recenter window
@@ -140,8 +140,8 @@ def fit_polynomial(binary_warped):
     right_curverad = ((1 + (2*right_fit[0]*y_eval*ym_per_pix + right_fit[1])**2)**1.5) / np.absolute(2*right_fit[0])
     
 
-    print(left_curverad)
-    print(right_curverad)
+    #print(left_curverad)
+    #print(right_curverad)
 
 
 
