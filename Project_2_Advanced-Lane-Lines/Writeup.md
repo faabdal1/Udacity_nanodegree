@@ -173,7 +173,7 @@ Overall, the pipeline was very well explained in theory during lessons, so it wa
 
 Due to time constrains, advanced functions are still missing to make it more robust. The pipeline work well during perfect weather condition and on "highway" lane marking but there are several problems. The real world has different weather condition, sharp turns or missing lane marking. These problems would need to be addressed. Also the code should be optimized to be as efficient as possible, especially considering that in AV a lane marking algorithm must run in real-time. 
 
-To make it more robust, I have started implementing sanity check to check whether shape of the lines makes sense. That is first step, the next step should be to use information acquired in previous steps to estimate position of the lines better and to stabilize the recognition. Another task to include sharp turns and different weather conditions.
+To make it more robust, I have started implementing sanity check to check whether shape of the lines makes sense (only width check is done). That is first step, the next step should be to use information acquired in previous steps to estimate position of the lines better and to stabilize the recognition. Another task to include sharp turns and different weather conditions.
 
 Additional information to identify can be HD map, which could provide information about e.g., lane marking style.
 

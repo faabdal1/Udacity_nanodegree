@@ -8,7 +8,6 @@ from moviepy.editor import VideoFileClip
 
 from functions.gradients import my_thr
 from functions.calibration import camera_calibration
-from functions.code import get_thresholded_image
 
 
 class Line():
@@ -346,15 +345,17 @@ class Line():
 
     def sanity_check(self,right_fitx, left_fitx):
 
+        # To check width of the line
+        # Take x value of left and right line
         botom = right_fitx[10] - left_fitx[10]
-        top = botom = right_fitx[700] - left_fitx[700]
         #print(right_fitx[10])
         #print(left_fitx[10])
 
         #print(botom)
         #print(top)
 
-        if ((botom > 500) and (botom <= 700)):
+        # Check condition
+        if ((botom > 600) and (botom <= 800)):
             self.detected = True
             return True
         else:
@@ -362,15 +363,18 @@ class Line():
             return False
 
     def pipeline(self, image):
-    
+        # To process raw frame and receive warped binary and M transformation matrix
         warped, M = self.img_process(image)
+        # To identify lanes and fit polynomial to them.
         right_fitx, left_fitx, ploty = self.fit_polynomial(warped)
         #plt.figure()
         #plt.imshow(color_warp)
         #plt.show()
 
+        # To calculate lane curvature and position of the vehicle 
         offset = self.calc_curv(right_fitx, left_fitx, ploty)
 
+        # Sanity check, if the lanes are not parallel, then search is sent back to sliding window
         if self.sanity_check(right_fitx, left_fitx) == False:
             print("search reset")
             self.last_fit_left = [np.array([False])]
@@ -378,7 +382,9 @@ class Line():
             right_fitx, left_fitx, ploty = self.fit_polynomial(warped)
             self.calc_curv(right_fitx, left_fitx, ploty)
             self.sanity_check(right_fitx, left_fitx)
+        #defined font
         font = cv2.FONT_HERSHEY_SIMPLEX
+        # include information about curvature and offset into frames
         if self.detected == True:
             result = self.draw_carpet(image, warped, right_fitx, left_fitx, ploty, M)
             cv2.putText(result, "Curvature: " + str(self.radius_of_curvature), (500,50), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
@@ -391,14 +397,15 @@ class Line():
 
 if __name__ == '__main__':
     
-    process = "vid"
+    ### What to process: im=images , vid=videos
+    process = "im"
     #process = "vid"
 
     if process == "im":
 
         # Individual images:
-        #list = os.listdir("test_images/")
-        list = ["straight_lines2.jpg"]
+        list = os.listdir("test_images/")
+        #list = ["straight_lines2.jpg"]
         for im_name in list:
             l = Line()
             if im_name ==".DS_Store": #filter unwanted mac files
@@ -412,7 +419,7 @@ if __name__ == '__main__':
         white_output = 'project_video_output.mp4'
         clip = VideoFileClip("project_video.mp4")
         #clip = VideoFileClip("harder_challenge_video.mp4").subclip(5,10)
-        white_clip = clip.fl_image(l.pipeline) #NOTE: this function expects color images!!
+        white_clip = clip.fl_image(l.pipeline) 
         white_clip.write_videofile(white_output, audio=False)
     else:
         print("Choose data source")
