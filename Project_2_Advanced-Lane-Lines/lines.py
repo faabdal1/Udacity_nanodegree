@@ -65,9 +65,9 @@ class Line():
         # to apply gradients to the image and get binary image
         combined = my_thr(image)
 
-        plt.figure()
-        plt.imshow(combined)
-        plt.show()
+        #plt.figure()
+        #plt.imshow(combined)
+        #plt.show()
 
         #size of current frame
         imshape = image.shape
@@ -152,7 +152,7 @@ class Line():
             #cv2.putText(out_img, "Right: f(y) = {}y**2 + {}y + {}".format(round(right_fit[0],2),round(right_fit[1],2),round(right_fit[2],2)), (400,500), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
             #plt.imshow(out_img)
             #plt.show()
-            
+
         else:
             # HYPERPARAMETER Choose the width of the margin around the previous polynomial to search
             margin = 100
@@ -326,17 +326,17 @@ class Line():
     def calc_curv(self, right_fitx, left_fitx, ploty):   
         y_eval = np.max(ploty)
         ym_per_pix = 30/700 # meters per pixel in y dimension
-        xm_per_pix = 3.7/700
+        xm_per_pix = 3.7/700 # width of lane per pixel (in y dimension)
 
-        
-        left_curverad = ((1 + (2*self.last_fit_left[0]*y_eval*ym_per_pix + self.last_fit_left[1])**2)**1.5) / (np.absolute(2*self.last_fit_left[0]))  ## Implement the calculation of the left line here
+        # Implement the calculation of the left and right lines 
+        left_curverad = ((1 + (2*self.last_fit_left[0]*y_eval*ym_per_pix + self.last_fit_left[1])**2)**1.5) / (np.absolute(2*self.last_fit_left[0]))  
         right_curverad = ((1 + (2*self.last_fit_right[0]*y_eval*ym_per_pix + self.last_fit_right[1])**2)**1.5) / np.absolute(2*self.last_fit_right[0])
         
         #print("left: " + str(left_curverad))
         #print("right: " + str(right_curverad)
         self.radius_of_curvature = round((left_curverad + right_curverad)/2)
 
-        mean = ((right_fitx[10] + left_fitx[10])/2)-640
+        mean = ((right_fitx[0] + left_fitx[0])/2)-640
         #print(mean)
         offset = xm_per_pix * (mean/2)
         #print(offset)
@@ -391,7 +391,7 @@ class Line():
 
 if __name__ == '__main__':
     
-    process = "im"
+    process = "vid"
     #process = "vid"
 
     if process == "im":
@@ -409,8 +409,8 @@ if __name__ == '__main__':
     elif process == "vid":
         
         l = Line()
-        white_output = 'harder_challenge_video_out.mp4'
-        clip = VideoFileClip("harder_challenge_video.mp4")
+        white_output = 'project_video_output.mp4'
+        clip = VideoFileClip("project_video.mp4")
         #clip = VideoFileClip("harder_challenge_video.mp4").subclip(5,10)
         white_clip = clip.fl_image(l.pipeline) #NOTE: this function expects color images!!
         white_clip.write_videofile(white_output, audio=False)

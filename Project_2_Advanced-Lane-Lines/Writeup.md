@@ -18,7 +18,7 @@ The goals / steps of this project are the following:
 [image3]: ./writeup_im/im3.png "Binary Example"
 [image4]: ./writeup_im/im4.png "Warp Example"
 [image5]: ./writeup_im/im5.png "Polynomial"
-[image6]: ./writeup_im/example_output.jpg "Output"
+[image6]: ./writeup_im/im6.jpg "Output"
 [video1]: ./project_video.mp4 "Video"
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/571/view) Points
@@ -98,11 +98,11 @@ Note: The perspective transformation in the actual script is performed on a bina
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
-The function `find_lane_pixels` to identify lines is located in `lines.py` on from lines 223 to 304. This function identify lines without previous identification. This function is part of the `fit_polynomial` which takes output from `find_lane_pixels` and calculates polynomial. It also checks whether the lines were identified in previous frame and if yes, then it skips to second half od the fit polynomial (lines 158 - 223 in `lines.py`) and searches for lines based on the polynomial from previous frame.
+The function `find_lane_pixels()` to identify lines is located in `lines.py` on from lines 223 to 304. This function identify lines without previous identification. This function is part of the `fit_polynomial()` which takes output from `find_lane_pixels()` and calculates polynomial. It also checks whether the lines were identified in previous frame and if yes, then it skips to second half od the fit polynomial (lines 158 - 223 in `lines.py`) and searches for lines based on the polynomial from previous frame.
 
 A) No detected lines in previous frame (applicable for single images)
 
-- if no lines were detected in previous frame or when it is image the function `find_lane_pixels` goes on. This function creates histogram and divides it into two half (left and right). Peak on right side and peak on left side defines middle point for sliding window.
+- if no lines were detected in previous frame or when it is image the function `find_lane_pixels()` goes on. This function creates histogram and divides it into two half (left and right). Peak on right side and peak on left side defines middle point for sliding window.
 - There are defined Hyperparemeters: number of sliding window (12), width of sliding window (100px) and minimal number of pixel to detect line (30px).
 - Then define lists to store detected lines for left and right side and setting height of window according to the number of windows.
 - then according to number of windows (rows), functions searches for lines according to the defined hyperparameters and append the list of pixel to the list and recenter the window to the position of last detected line 
@@ -117,18 +117,41 @@ B) Detected lines in previous frame (lines 158 - 223 in `lines.py`)
 - it searches for lines in are of the polynomial from previous frame with predefined margin (100px)
 - it again extract pixel position of left and right lanes and calculates polynomial
 
-
 ![Polynomial][image5]
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-I did this in lines # through # in my code in `my_other_file.py`
+The curvature of the lines and the position of the vehicle with respect to center in function `calc_curv` in file `lines.py` (lines 326 - 344)
+
+To calculate curvature and position of the car in meter, I defined this parameter to transform pixels to concrete distance:
+
+```
+y_eval #to cover same max y-range as image
+ym_per_pix = 30/700 # meters per pixel in y dimension
+xm_per_pix = 3.7/700 # width of lane per pixel (in y dimension)
+```
+
+Formula to calculate curvature:  
+
+```
+R_curve = ((1+(2Ay+B)ˆ2)ˆ2/3)/∣2A∣
+```
+To calculate actual curvature in meters:
+
+```
+R_curve = ((1+(2*A*y_eval*ym_per_pix+B)ˆ2)ˆ2/3)/∣2A∣
+```
+
+Output gives me curvature in meters for right and left lane, which then I took average.
+
+Position of the EGO is calculate that I took position of right and left lane at first x position (closest to the EGO) and calculated mean. This gives position of the middle of the lane. In order to calculate position of the car I offset from middle which I half and multiply by `xm_per_pix` to receive distance in meter.
+
 
 #### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
+I implemented this step in lines 307 through 324 in my code in `lines.py` in the function `draw_carpet()`.  Here is an example of my result on a test image:
 
-![alt text][image6]
+![Carpet][image6]
 
 ---
 
@@ -136,7 +159,7 @@ I implemented this step in lines # through # in my code in `yet_another_file.py`
 
 #### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
 
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](./video_output/project_video_output.mp4)
 
 ---
 
@@ -144,4 +167,14 @@ Here's a [link to my video result](./project_video.mp4)
 
 #### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+The biggest issue was to come up with reasonable methods and parameter of threshold and how to combine them. It took significant amount of time to explore different variations. 
+
+Overall, the pipeline was very well explained in theory during lessons, so it wasn't problem to implement it. 
+
+Due to time constrains, advanced functions are still missing to make it more robust. The pipeline work well during perfect weather condition and on "highway" lane marking but there are several problems. The real world has different weather condition, sharp turns or missing lane marking. These problems would need to be addressed. Also the code should be optimized to be as efficient as possible, especially considering that in AV a lane marking algorithm must run in real-time. 
+
+To make it more robust, I have started implementing sanity check to check whether shape of the lines makes sense. That is first step, the next step should be to use information acquired in previous steps to estimate position of the lines better and to stabilize the recognition. Another task to include sharp turns and different weather conditions.
+
+Additional information to identify can be HD map, which could provide information about e.g., lane marking style.
+
+
