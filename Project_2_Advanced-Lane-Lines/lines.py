@@ -6,8 +6,9 @@ from matplotlib import pylab as pl
 import pickle
 from moviepy.editor import VideoFileClip
 
-from functions.gradients import Gradients
+from functions.gradients import my_thr
 from functions.calibration import camera_calibration
+from functions.code import get_thresholded_image
 
 
 class Line():
@@ -22,8 +23,10 @@ class Line():
         self.best_fit = None  
         #polynomial coefficients for the most recent fit
         self.current_fit = [np.array([False])]
-
+        
+        #leftx from last frame
         self.last_fit_left = [np.array([False])]  
+        #rightx from last frame
         self.last_fit_right = [np.array([False])]  
  
         #radius of curvature of the line in some units
@@ -37,7 +40,8 @@ class Line():
         #y values for detected line pixels
         self.ally = None  
 
-         # If the the calibration_parameters.p exist, reads the parameters and continues
+        # Initiates calibration process or loads calibration parameters
+        # If the the calibration_parameters.p exist, reads the parameters and continues
         if os.path.isfile('calibration_parameters.p'):
             self.mtx = pickle.load(open("calibration_parameters.p", "rb"))["mtx"]
             self.dist = pickle.load(open("calibration_parameters.p", "rb"))["dist"]
@@ -53,20 +57,23 @@ class Line():
         #print("Dist: " + str(dist))
         #print("Mtx: " + str(mtx))
         
-
+    # function to process image and return warped
     def img_process(self, image):
-        # Apply selected gradients to the image 
+        # Undistort image based on calibration parameters 
         image = cv2.undistort(image, self.mtx, self.dist, None, self.mtx)
 
-        hls_s = Gradients.hls_select(image, thresh=(90, 255))
-        hls_l_gradx = Gradients.hls_l_xgrad(image, 5, thresh=(20, 255))
+        # to apply gradients to the image and get binary image
+        combined = my_thr(image)
 
-        combined = np.zeros_like(image)
-        combined = hls_s | hls_l_gradx 
+        plt.figure()
+        plt.imshow(combined)
+        plt.show()
 
-        #Define region of interest and apply to edges
+        #size of current frame
         imshape = image.shape
         #print(imshape)
+
+        #Define region which is rectangle from top view
         a = (int(imshape[1]*0.19), int(imshape[0]-40))
         b = (int(imshape[1]*0.462), int(imshape[0]*0.63))
         c = (int(imshape[1]*0.538), int(imshape[0]*0.63))
@@ -75,35 +82,143 @@ class Line():
         vertices = np.array([[a, b, c, d]], dtype=np.int32)
         #print("Vertices: " + str(vertices))
 
-        # Draw region for perspective tranformation 
+        # We can draw region for perspective tranformation 
         cervena = image.copy()
         cervena = cv2.line(cervena, a, b, color=[255, 0, 0], thickness=3)
         cervena = cv2.line(cervena, b, c, color=[255, 0, 0], thickness=3)
         cervena = cv2.line(cervena, c, d, color=[255, 0, 0], thickness=3)
         cervena = cv2.line(cervena, d, a, color=[255, 0, 0], thickness=3)
-        f, axarr = plt.subplots(3,2)
-        axarr[1,0].imshow(cervena)
+        
+        
 
 
-        src = np.float32([[a],[b],[c],[d]])
-        img_size = (image.shape[1], image.shape[0])
-        #print(img_size)
+        #define source region for transforamtion
+        src = np.float32([a,b,c,d])
 
+        #define destination region for transforamtion
         dst = np.float32(
             [[(imshape[1] / 4), imshape[0]],
             [(imshape[1] / 4), 0],
             [(imshape[1] * 3 / 4), 0],
             [(imshape[1] * 3 / 4), imshape[0]]])
+        dst1 = np.float32(
+            [((imshape[1] / 4), imshape[0]),
+            ((imshape[1] / 4), 0),
+            ((imshape[1] * 3 / 4), 0),
+            ((imshape[1] * 3 / 4), imshape[0])])
 
         # Use cv2.getPerspectiveTransform() to get M, the transform matrix
         M = cv2.getPerspectiveTransform(src, dst)
         # Use cv2.warpPerspective() to warp your image to a top-down view
-        warped = cv2.warpPerspective(combined, M, img_size, flags=cv2.INTER_LINEAR)
-
-        axarr[1,1].imshow(warped)
-        #plt.show()
+        warped = cv2.warpPerspective(combined, M, (image.shape[1], image.shape[0]), flags=cv2.INTER_LINEAR)
 
         return warped, M
+
+    #find polynomial representation of the two lines
+    def fit_polynomial(self, binary_warped):
+        if self.last_fit_left[0] == False or self.last_fit_right[0] == False :
+            
+            # Find our lane pixels first
+            leftx, lefty, rightx, righty, out_img = self.find_lane_pixels(binary_warped)
+
+            #Fit a second order polynomial to each using `np.polyfit` ###
+            left_fit = np.polyfit(lefty, leftx, 2)
+            right_fit = np.polyfit(righty, rightx, 2)
+
+            self.last_fit_left = left_fit
+            self.last_fit_right = right_fit
+
+            # Generate x and y values for plotting
+            ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
+            try:
+                left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+                right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+            except TypeError:
+                # Avoids an error if `left` and `right_fit` are still none or incorrect
+                print('The function failed to fit a line!')
+                left_fitx = 1*ploty**2 + 1*ploty
+                right_fitx = 1*ploty**2 + 1*ploty
+
+            ## Visualization ##
+            # Colors in the left and right lane regions
+            #out_img[lefty, leftx] = [255, 0, 0]
+            #out_img[righty, rightx] = [0, 0, 255]
+
+            # Plots the left and right polynomials on the lane lines
+            #plt.plot(left_fitx, ploty, color='yellow')
+            #plt.plot(right_fitx, ploty, color='yellow')
+            #font = cv2.FONT_HERSHEY_SIMPLEX
+            #cv2.putText(out_img, "Left: f(y) = {}y**2 + {}y + {}".format(round(left_fit[0],2),round(left_fit[1],2),round(left_fit[2],2)), (150,100), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
+            #cv2.putText(out_img, "Right: f(y) = {}y**2 + {}y + {}".format(round(right_fit[0],2),round(right_fit[1],2),round(right_fit[2],2)), (400,500), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
+            #plt.imshow(out_img)
+            #plt.show()
+            
+        else:
+            # HYPERPARAMETER Choose the width of the margin around the previous polynomial to search
+            margin = 100
+
+            left_fit = self.last_fit_left
+            right_fit = self.last_fit_right
+            # Grab activated pixels
+            nonzero = binary_warped.nonzero()
+            nonzeroy = np.array(nonzero[0])
+            nonzerox = np.array(nonzero[1])
+            
+            #Set the area of search based on activated x-values
+            left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + 
+                            left_fit[2] - margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + 
+                            left_fit[1]*nonzeroy + left_fit[2] + margin)))
+            right_lane_inds =  ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + 
+                            right_fit[2] - margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + 
+                            right_fit[1]*nonzeroy + right_fit[2] + margin)))
+            
+            # Again, extract left and right line pixel positions
+            leftx = nonzerox[left_lane_inds]
+            lefty = nonzeroy[left_lane_inds] 
+            rightx = nonzerox[right_lane_inds]
+            righty = nonzeroy[right_lane_inds]
+
+            left_fit = np.polyfit(lefty, leftx, 2)
+            right_fit = np.polyfit(righty, rightx, 2)
+
+            self.last_fit_left = left_fit
+            self.last_fit_right = right_fit
+
+            img_shape = binary_warped.shape
+            # Generate x and y values for plotting
+            ploty = np.linspace(0, img_shape[0]-1, img_shape[0])
+            # Calc both polynomials using ploty, left_fit and right_fit
+            left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
+            right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+
+            ## Visualization ##
+            # Create an image to draw on and an image to show the selection window
+            #out_img = np.dstack((binary_warped, binary_warped, binary_warped))*255
+            #window_img = np.zeros_like(out_img)
+            # Color in left and right line pixels
+            #out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+            #out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+
+            # Generate a polygon to illustrate the search window area
+            # And recast the x and y points into usable format for cv2.fillPoly()
+            #left_line_window1 = np.array([np.transpose(np.vstack([left_fitx-margin, ploty]))])
+            #left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx+margin, 
+            #                        ploty])))])
+            #left_line_pts = np.hstack((left_line_window1, left_line_window2))
+            #right_line_window1 = np.array([np.transpose(np.vstack([right_fitx-margin, ploty]))])
+            #right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx+margin, 
+            #                        ploty])))])
+            #right_line_pts = np.hstack((right_line_window1, right_line_window2))
+
+            # Draw the lane onto the warped blank image
+            #cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
+            #cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
+            #color_warp = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)     
+            # Plot the polynomial lines onto the image
+            #plt.plot(left_fitx, ploty, color='yellow')
+            #plt.plot(right_fitx, ploty, color='yellow')
+            ## End visualization steps ##       
+        return right_fitx, left_fitx, ploty
 
 
     def find_lane_pixels(self, binary_warped):
@@ -119,11 +234,11 @@ class Line():
 
         # HYPERPARAMETERS
         # Choose the number of sliding windows
-        nwindows = 15
+        nwindows = 12
         # Set the width of the windows +/- margin
         margin = 100
         # Set minimum number of pixels found to recenter window
-        minpix = 50
+        minpix = 30
 
         # Set height of windows - based on nwindows above and image shape
         window_height = np.int(binary_warped.shape[0]//nwindows)
@@ -144,7 +259,7 @@ class Line():
             # Identify window boundaries in x and y (and right and left)
             win_y_low = binary_warped.shape[0] - (window+1)*window_height
             win_y_high = binary_warped.shape[0] - window*window_height
-            ### TO-DO: Find the four below boundaries of the window ###
+            #Find the four below boundaries of the window 
             win_xleft_low = leftx_current - margin  # Update this
             win_xleft_high = leftx_current + margin  # Update this
             win_xright_low = rightx_current - margin  # Update this
@@ -156,7 +271,7 @@ class Line():
             cv2.rectangle(out_img,(win_xright_low,win_y_low),
             (win_xright_high,win_y_high),(0,255,0), 2) 
             
-            ### TO-DO: Identify the nonzero pixels in x and y within the window ###
+            # Identify the nonzero pixels in x and y within the window 
             good_left_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & 
             (nonzerox >= win_xleft_low) &  (nonzerox < win_xleft_high)).nonzero()[0]
             good_right_inds = ((nonzeroy >= win_y_low) & (nonzeroy < win_y_high) & 
@@ -166,8 +281,8 @@ class Line():
             left_lane_inds.append(good_left_inds)
             right_lane_inds.append(good_right_inds)
             
-            ### TO-DO: If you found > minpix pixels, recenter next window ###
-            ### (`right` or `leftx_current`) on their mean position ###
+            # If you found > minpix pixels, recenter next window 
+            ### (`right` or `leftx_current`) on their mean position 
             if len(good_left_inds) > (minpix):
                 leftx_current = np.int(np.mean(nonzerox[good_left_inds]))
             if len(good_right_inds) > (minpix):
@@ -189,129 +304,6 @@ class Line():
 
         return leftx, lefty, rightx, righty, out_img
 
-
-    def fit_polynomial(self, binary_warped):
-        if self.last_fit_left[0] == False:
-            print(self.last_fit_left[0])
-
-            # Find our lane pixels first
-            leftx, lefty, rightx, righty, out_img = self.find_lane_pixels(binary_warped)
-
-            ### TO-DO: Fit a second order polynomial to each using `np.polyfit` ###
-            left_fit = np.polyfit(lefty, leftx, 2)
-            right_fit = np.polyfit(righty, rightx, 2)
-
-            self.last_fit_left = left_fit
-            self.last_fit_right = right_fit
-
-            # Generate x and y values for plotting
-            ploty = np.linspace(0, binary_warped.shape[0]-1, binary_warped.shape[0] )
-            try:
-                left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
-                right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
-            except TypeError:
-                # Avoids an error if `left` and `right_fit` are still none or incorrect
-                print('The function failed to fit a line!')
-                left_fitx = 1*ploty**2 + 1*ploty
-                right_fitx = 1*ploty**2 + 1*ploty
-
-            ## Visualization ##
-            # Colors in the left and right lane regions
-            out_img[lefty, leftx] = [255, 0, 0]
-            out_img[righty, rightx] = [0, 0, 255]
-
-            # Plots the left and right polynomials on the lane lines
-            plt.plot(left_fitx, ploty, color='yellow')
-            plt.plot(right_fitx, ploty, color='yellow')
-
-            
-
-
-            #plt.imshow(out_img)
-            #plt.show()
-
-          
-        else:
-            # HYPERPARAMETER
-            # Choose the width of the margin around the previous polynomial to search
-            # The quiz grader expects 100 here, but feel free to tune on your own!
-            margin = 100
-
-            left_fit = self.last_fit_left
-            right_fit = self.last_fit_right
-            # Grab activated pixels
-            nonzero = binary_warped.nonzero()
-            nonzeroy = np.array(nonzero[0])
-            nonzerox = np.array(nonzero[1])
-            
-            ### TO-DO: Set the area of search based on activated x-values ###
-            ### within the +/- margin of our polynomial function ###
-            ### Hint: consider the window areas for the similarly named variables ###
-            ### in the previous quiz, but change the windows to our new search area ###
-            left_lane_inds = ((nonzerox > (left_fit[0]*(nonzeroy**2) + left_fit[1]*nonzeroy + 
-                            left_fit[2] - margin)) & (nonzerox < (left_fit[0]*(nonzeroy**2) + 
-                            left_fit[1]*nonzeroy + left_fit[2] + margin)))
-            right_lane_inds =  ((nonzerox > (right_fit[0]*(nonzeroy**2) + right_fit[1]*nonzeroy + 
-                            right_fit[2] - margin)) & (nonzerox < (right_fit[0]*(nonzeroy**2) + 
-                            right_fit[1]*nonzeroy + right_fit[2] + margin)))
-            
-            # Again, extract left and right line pixel positions
-            leftx = nonzerox[left_lane_inds]
-            lefty = nonzeroy[left_lane_inds] 
-            rightx = nonzerox[right_lane_inds]
-            righty = nonzeroy[right_lane_inds]
-
-            # Fit new polynomials
-            left_fitx, right_fitx, ploty = self.fit_poly(binary_warped.shape, leftx, lefty, rightx, righty)
-            
-            ## Visualization ##
-            # Create an image to draw on and an image to show the selection window
-            out_img = np.dstack((binary_warped, binary_warped, binary_warped))*255
-            window_img = np.zeros_like(out_img)
-            # Color in left and right line pixels
-            out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-            out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
-
-            # Generate a polygon to illustrate the search window area
-            # And recast the x and y points into usable format for cv2.fillPoly()
-            left_line_window1 = np.array([np.transpose(np.vstack([left_fitx-margin, ploty]))])
-            left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx+margin, 
-                                    ploty])))])
-            left_line_pts = np.hstack((left_line_window1, left_line_window2))
-            right_line_window1 = np.array([np.transpose(np.vstack([right_fitx-margin, ploty]))])
-            right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx+margin, 
-                                    ploty])))])
-            right_line_pts = np.hstack((right_line_window1, right_line_window2))
-
-            # Draw the lane onto the warped blank image
-            cv2.fillPoly(window_img, np.int_([left_line_pts]), (0,255, 0))
-            cv2.fillPoly(window_img, np.int_([right_line_pts]), (0,255, 0))
-            color_warp = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
-            
-            # Plot the polynomial lines onto the image
-            plt.plot(left_fitx, ploty, color='yellow')
-            plt.plot(right_fitx, ploty, color='yellow')
-            ## End visualization steps ##     
-            
-        return right_fitx, left_fitx, ploty
-
-    def fit_poly(self, img_shape, leftx, lefty, rightx, righty):
-        ### TO-DO: Fit a second order polynomial to each with np.polyfit() ###
-        left_fit = np.polyfit(lefty, leftx, 2)
-        right_fit = np.polyfit(righty, rightx, 2)
-
-        self.last_fit_left = left_fit
-        self.last_fit_right = right_fit
-
-
-        # Generate x and y values for plotting
-        ploty = np.linspace(0, img_shape[0]-1, img_shape[0])
-        ### TO-DO: Calc both polynomials using ploty, left_fit and right_fit ###
-        left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
-        right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
-        
-        return left_fitx, right_fitx, ploty
-
     def draw_carpet(self, image, warped, right_fitx, left_fitx, ploty, M):
 
         # Recast the x and y points into usable format for cv2.fillPoly()
@@ -331,7 +323,7 @@ class Line():
         result = cv2.addWeighted(image, 1, newwarp, 0.3, 0)
         return result
 
-    def calc_curv(self, ploty):   
+    def calc_curv(self, right_fitx, left_fitx, ploty):   
         y_eval = np.max(ploty)
         ym_per_pix = 30/700 # meters per pixel in y dimension
         xm_per_pix = 3.7/700
@@ -344,23 +336,29 @@ class Line():
         #print("right: " + str(right_curverad)
         self.radius_of_curvature = round((left_curverad + right_curverad)/2)
 
-        return self.radius_of_curvature
+        mean = ((right_fitx[10] + left_fitx[10])/2)-640
+        #print(mean)
+        offset = xm_per_pix * (mean/2)
+        #print(offset)
+
+        return round(offset,2)
 
 
     def sanity_check(self,right_fitx, left_fitx):
 
         botom = right_fitx[10] - left_fitx[10]
         top = botom = right_fitx[700] - left_fitx[700]
-        print(botom)
-        print(top)
+        #print(right_fitx[10])
+        #print(left_fitx[10])
+
+        #print(botom)
+        #print(top)
 
         if ((botom > 500) and (botom <= 700)):
             self.detected = True
-            print("jo")
             return True
         else:
             self.detected = False
-            print("ne")
             return False
 
     def pipeline(self, image):
@@ -371,31 +369,50 @@ class Line():
         #plt.imshow(color_warp)
         #plt.show()
 
-        self.calc_curv(ploty)
+        offset = self.calc_curv(right_fitx, left_fitx, ploty)
 
         if self.sanity_check(right_fitx, left_fitx) == False:
-            print("hledam znova")
+            print("search reset")
             self.last_fit_left = [np.array([False])]
             self.last_fit_left = [np.array([False])]
             right_fitx, left_fitx, ploty = self.fit_polynomial(warped)
-            self.calc_curv(ploty)
+            self.calc_curv(right_fitx, left_fitx, ploty)
             self.sanity_check(right_fitx, left_fitx)
-
-
         font = cv2.FONT_HERSHEY_SIMPLEX
         if self.detected == True:
             result = self.draw_carpet(image, warped, right_fitx, left_fitx, ploty, M)
             cv2.putText(result, "Curvature: " + str(self.radius_of_curvature), (500,50), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
+            cv2.putText(result, "Vehicle is {}m left of center".format(str(offset)), (500,100), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
         else:
             result = self.draw_carpet(image, warped, right_fitx, left_fitx, ploty, M)
             cv2.putText(result, "Bad detection ", (500,50), font, 1, (0, 255, 0), 2, cv2.LINE_AA)
             print("no lines")
-        return (result) 
+        return result
 
 if __name__ == '__main__':
-    l = Line()
-    white_output = 'project_video_output2.mp4'
-    #clip = VideoFileClip("project_video.mp4").subclip(1,5)
-    clip = VideoFileClip("challenge_video.mp4").subclip(0,10)
-    white_clip = clip.fl_image(l.pipeline) #NOTE: this function expects color images!!
-    white_clip.write_videofile(white_output, audio=False)
+    
+    process = "im"
+    #process = "vid"
+
+    if process == "im":
+
+        # Individual images:
+        #list = os.listdir("test_images/")
+        list = ["straight_lines2.jpg"]
+        for im_name in list:
+            l = Line()
+            if im_name ==".DS_Store": #filter unwanted mac files
+                continue
+            else:
+                img = l.pipeline(cv2.cvtColor(cv2.imread('test_images/{}'.format(im_name)), cv2.COLOR_RGB2BGR))
+                cv2.imwrite(r"output_images/{}".format(im_name), (cv2.cvtColor(img, cv2.COLOR_RGB2BGR)) )
+    elif process == "vid":
+        
+        l = Line()
+        white_output = 'harder_challenge_video_out.mp4'
+        clip = VideoFileClip("harder_challenge_video.mp4")
+        #clip = VideoFileClip("harder_challenge_video.mp4").subclip(5,10)
+        white_clip = clip.fl_image(l.pipeline) #NOTE: this function expects color images!!
+        white_clip.write_videofile(white_output, audio=False)
+    else:
+        print("Choose data source")
